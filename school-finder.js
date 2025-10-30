@@ -208,72 +208,41 @@ function detectType(tags) {
   return 'Unknown';
 }
 
-// Extract principal information
-function extractPrincipal(tags) {
+
+// Extract email information
+function extractEmail(tags) {
   if (!tags) return '';
 
-  const personKeys = [
-    'contact:person', 'contact:name', 'operator:person', 'operator:name', 'operator:contact',
-    'headteacher', 'principal', 'headmaster', 'head_teacher', 'head_master',
-    'school:principal', 'school:headmaster', 'school:head_teacher', 'head', 'director',
-    'school:director', 'leadership', 'management:person',
-    'rektor', 'skolerektor', 'skolebestyrer', 'skoleleder', 'skolesjef',
-    'inspektør', 'undervisningsinspektør', 'avdelingsleder', 'studierektor', 'assisterende rektor',
-    'school:rektor', 'contact:rektor', 'operator:rektor', 'name:rektor',
-    'school:skoleleder', 'contact:skoleleder', 'contact', 'contact:details',
-    'description', 'operator', 'operator:description'
+  const emailKeys = [
+    'email',
+    'contact:email',
+    'operator:email',
+    'school:email',
+    'contact:mail',
+    'mail'
   ];
 
-  const nameTags = ['name', 'alt_name', 'official_name', 'short_name'];
-  for (const nameTag of nameTags) {
-    const name = tags[nameTag];
-    if (name && typeof name === 'string') {
-      const lower = name.toLowerCase();
-      if (lower.includes('rektor:') || lower.includes('principal:') || lower.includes('head:')) {
-        const match = name.match(/(?:rektor|principal|head):\s*([^,;]+)/i);
-        if (match) return match[1].trim();
-      }
-    }
-  }
-
-  for (const key of personKeys) {
-    const v = tags[key];
-    if (v && typeof v === 'string') {
-      const cleaned = v.trim();
-      if (
-        cleaned &&
-        !cleaned.includes('http') &&
-        !cleaned.includes('www.') &&
-        !cleaned.includes('@') &&
-        !cleaned.match(/^\+?\d[\d\s-]+$/)
-      ) {
+  // Check direct email tags
+  for (const key of emailKeys) {
+    const value = tags[key];
+    if (value && typeof value === 'string') {
+      const cleaned = value.trim();
+      // Basic email validation
+      if (cleaned && cleaned.includes('@') && cleaned.includes('.')) {
         return cleaned;
       }
     }
   }
 
-  const descriptionTags = ['description', 'contact:details', 'operator:description'];
+  // Check description or contact:details for embedded emails
+  const descriptionTags = ['description', 'contact:details', 'note', 'operator:description'];
   for (const key of descriptionTags) {
     const desc = tags[key];
     if (desc && typeof desc === 'string') {
-      const lower = desc.toLowerCase();
-      if (
-        lower.includes('rektor') ||
-        lower.includes('principal') ||
-        lower.includes('head teacher') ||
-        lower.includes('skoleleder')
-      ) {
-        const parts = desc.split(/[.,;:\n]/);
-        for (const part of parts) {
-          if (
-            part.toLowerCase().includes('rektor') ||
-            part.toLowerCase().includes('principal') ||
-            part.toLowerCase().includes('head teacher') ||
-            part.toLowerCase().includes('skoleleder')
-          ) {
-            return part.trim();
-          }
-        }
+      // Look for email pattern
+      const emailMatch = desc.match(/[\w.-]+@[\w.-]+\.\w+/);
+      if (emailMatch) {
+        return emailMatch[0];
       }
     }
   }
@@ -340,7 +309,7 @@ async function handleSearch() {
         const name = tags.name || 'Unnamed School';
         const website = tags.website || tags['contact:website'] || '';
         const type = detectType(tags);
-        const principal = extractPrincipal(tags);
+        const principal = extractEmail(tags);
 
         // Exclude VGS, college, high schools, and anything after primary/elementary
         const lowerName = name.toLowerCase();
