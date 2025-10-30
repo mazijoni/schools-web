@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Finder</title>
+  <link rel="icon" href="images/earth-pink.svg" type="image/svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Alatsi&family=BBH+Sans+Bogle&family=Chewy&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #fff7ff;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      color: #2d004d;
+      margin-bottom: 40px;
+    }
+
+    .header h1 {
+        font-family: 'Chewy', 'Alatsi', sans-serif;
+        font-size: 3rem;
+        margin-bottom: 10px;
+
+        /* Gradient text */
+        background: linear-gradient(90deg, #2a0163, #ff0dcf); /* left to right gradient */
+        background-clip: text;            /* standard property */
+        background-size: 35% 100%;
+        -webkit-background-clip: text;    /* WebKit browsers */
+        -webkit-text-fill-color: transparent;
+        color: transparent;               /* fallback for older browsers */
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .header p {
+      font-size: 1.2rem;
+      opacity: 0.8;
+    }
+
+    .search-box {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 10px 30px rgba(211, 10, 172, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .search-form {
+      display: flex;
+      gap: 15px;
+      flex-wrap: wrap;
+    }
+
+    .search-input {
+      flex: 1;
+      min-width: 300px;
+      padding: 15px 20px;
+      font-size: 1rem;
+      border: 2px solid #f2d9f7;
+      border-radius: 12px;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .search-input:focus {
+      border-color: #d30aac;
+    }
+
+    .btn {
+      padding: 15px 30px;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-primary {
+      background: #d30aac;
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: #b3098c;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(211, 10, 172, 0.3);
+    }
+
+    .btn-primary:disabled {
+      background: #f0bde7;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      background: #fdf1fc;
+      color: #7a1fa2;
+      border: 1px solid #f2d9f7;
+    }
+
+    .btn-secondary:hover {
+      background: #f7e0f7;
+    }
+
+    .error {
+      background: #ffe0ef;
+      color: #a0005c;
+      padding: 15px 20px;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      border-left: 4px solid #d30aac;
+    }
+
+    .results {
+      background: white;
+      border-radius: 16px;
+      padding: 30px;
+      box-shadow: 0 10px 40px rgba(211, 10, 172, 0.1);
+      display: none;
+    }
+
+    .results.show {
+      display: block;
+    }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #f2d9f7;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .results-title h2 {
+      font-size: 1.8rem;
+      color: #2d004d;
+      margin-bottom: 5px;
+    }
+
+    .results-title p {
+      color: #7a1fa2;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filters {
+      background: #fdf1fc;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 25px;
+      display: none;
+    }
+
+    .filters.show {
+      display: block;
+    }
+
+    .filter-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 20px;
+    }
+
+    .filter-group label {
+      display: block;
+      font-weight: 600;
+      color: #7a1fa2;
+      margin-bottom: 8px;
+      font-size: 0.9rem;
+    }
+
+    .filter-group select,
+    .filter-group input {
+      width: 100%;
+      padding: 10px 15px;
+      border: 1px solid #f2d9f7;
+      border-radius: 8px;
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .filter-group select:focus,
+    .filter-group input:focus {
+      border-color: #d30aac;
+    }
+
+    .schools-grid {
+      display: grid;
+      gap: 15px;
+    }
+
+    .school-card {
+      background: white;
+      border: 1px solid #f2d9f7;
+      border-radius: 12px;
+      padding: 20px;
+      transition: all 0.3s;
+    }
+
+    .school-card:hover {
+      border-color: #d30aac;
+      box-shadow: 0 4px 12px rgba(211, 10, 172, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .school-name {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: #2d004d;
+      margin-bottom: 10px;
+    }
+
+    .school-detail a {
+      color: #d30aac;
+      text-decoration: none;
+    }
+
+    .school-detail a:hover {
+      text-decoration: underline;
+    }
+
+    .badge-public {
+      background: #ffe3f7;
+      color: #a0005c;
+    }
+
+    .badge-private {
+      background: #f7e0f7;
+      color: #7a1fa2;
+    }
+
+    .badge-unknown {
+      background: #f4e1f7;
+      color: #6a007f;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #7a1fa2;
+    }
+
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #d30aac;
+      font-size: 1.1rem;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      border: 4px solid #f2d9f7;
+      border-top-color: #d30aac;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 768px) {
+      .header h1 {
+        font-size: 2rem;
+      }
+      .search-input {
+        min-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #d30aac;">
+        <img src="images/atom-pink.svg" alt="Earth Icon" width="50" height="50">
+        School Finder
+        <img src="images/earth-pink.svg" alt="Earth Icon" width="50" height="50">
+      </h1>
+
+      <p>Find schools anywhere in the world</p>
+    </div>
+
+    <div class="search-box">
+      <div class="search-form">
+        <input 
+          type="text" 
+          id="cityInput" 
+          class="search-input" 
+          placeholder="Enter city name (e.g., Oslo, Berlin, Paris)"
+        >
+        <button id="searchBtn" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z"/></svg>
+            Search
+        </button>
+      </div>
+    </div>
+
+    <div id="error" class="error" style="display: none;"></div>
+
+    <div id="loading" class="loading" style="display: none;">
+      <div class="spinner"></div>
+      <div>Searching for schools...</div>
+    </div>
+
+    <div id="results" class="results">
+      <div class="results-header">
+        <div class="results-title">
+          <h2><span id="schoolCount">0</span> schools found</h2>
+          <p>in <span id="cityName"></span></p>
+        </div>
+        <div class="controls">
+          <button id="filterBtn" class="btn btn-secondary">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#7a1fa2"><path d="M440-160q-17 0-28.5-11.5T400-200v-240L168-736q-15-20-4.5-42t36.5-22h560q26 0 36.5 22t-4.5 42L560-440v240q0 17-11.5 28.5T520-160h-80Zm40-308 198-252H282l198 252Zm0 0Z"/></svg>
+            Filters
+        </button>
+          <button id="exportBtn" class="btn btn-primary">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#ffffff"><path d="M480-480ZM202-65l-56-57 118-118h-90v-80h226v226h-80v-89L202-65Zm278-15v-80h240v-440H520v-200H240v400h-80v-400q0-33 23.5-56.5T240-880h320l240 240v480q0 33-23.5 56.5T720-80H480Z"/></svg>
+            Export CSV
+        </button>
+        </div>
+      </div>
+
+      <div id="filters" class="filters">
+        <div class="filter-row">
+          <div class="filter-group">
+            <label for="typeFilter">Filter by Type</label>
+            <select id="typeFilter">
+              <option value="all">All Types</option>
+              <option value="public">Public</option>
+              <option value="private">Private</option>
+              <option value="unknown">Unknown</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label for="nameSearch">Search by Name</label>
+            <input type="text" id="nameSearch" placeholder="Search schools...">
+          </div>
+        </div>
+      </div>
+
+      <div id="schoolsGrid" class="schools-grid"></div>
+    </div>
+
+    <div id="emptyState" class="empty-state">
+      <div class="empty-state-icon">
+        <img src="images/books-pink.svg" alt="Earth Icon" width="80" height="80">
+    </div>
+      <p>Enter a city name to find schools</p>
+    </div>
+  </div>
+
+  <script src="school-finder.js"></script>
+</body>
+</html>
