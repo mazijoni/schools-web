@@ -1,10 +1,11 @@
 {
   "name": "n8n-alt",
   "version": "1.0.0",
-  "description": "",
+  "description": "> **Welcome!** This guide will help you use the School Finder tool to discover primary schools in any city around the world.",
   "main": "get_schools.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -14,5 +15,15 @@
     "csv-writer": "^1.6.0",
     "inquirer": "^8.2.7",
     "node-fetch": "^2.7.0"
-  }
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mazijoni/schools-web.git"
+  },
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mazijoni/schools-web/issues"
+  },
+  "homepage": "https://github.com/mazijoni/schools-web#readme"
 }
