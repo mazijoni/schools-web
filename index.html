@@ -22,6 +22,68 @@
       padding: 20px;
     }
 
+    /* === DARK MODE ADDITIONS === */
+    body.dark-mode {
+      background-color: #210d27;
+      color: #f1f1f1;
+    }
+
+    body.dark-mode header,
+    body.dark-mode .main-container {
+      background-color: #121212;
+    }
+
+    body.dark-mode .school-card {
+      background-color: #181818;
+      border: 1px solid #2a2a2a;
+      color: #fff;
+    }
+
+    body.dark-mode button,
+    body.dark-mode input {
+      background-color: #302731;
+      color: #fff;
+      border-color: #c772fe;
+    }
+
+    body.dark-mode .theme-toggle {
+      background-color: transparent;
+      color: #c772fe;
+      border-color: #c772fe;
+    }
+
+    body.dark-mode .theme-toggle:hover {
+      background-color: #c772fe;
+      color: #fff;
+    }
+
+    /* === DARK MODE for Search Box === */
+    body.dark-mode .search-box {
+      background-color: #1a1a1a;
+      border: 1px solid #7d417b;
+      box-shadow: 0 0 10px rgba(199, 114, 254, 0.15);
+    }
+
+    body.dark-mode .search-box input[type="text"] {
+      background-color: #241627;
+      color: #fff;
+      border: 1px solid #333;
+    }
+
+    body.dark-mode .search-box input[type="text"]::placeholder {
+      color: #aaa;
+    }
+
+    body.dark-mode .search-box button {
+      background-color: #c772fe;
+      color: #fff;
+      border: none;
+    }
+
+    body.dark-mode .search-box button:hover {
+      background-color: #a857db;
+    }
+
     .container {
       max-width: 1200px;
       margin: 0 auto;
@@ -29,7 +91,7 @@
 
     .header {
       text-align: center;
-      color: #2d004d;
+      color: #744b92;
       margin-bottom: 40px;
     }
 
@@ -295,6 +357,22 @@
       margin-bottom: 15px;
     }
 
+    .theme-toggle {
+      background: none;
+      border: 2px solid #c772fe;
+      color: #c772fe;
+      border-radius: 8px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: 0.3s;
+    }
+
+    .theme-toggle:hover {
+      background: #c772fe;
+      color: white;
+    }
+
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
@@ -339,6 +417,10 @@
 <body>
   <div class="container">
     <div class="header">
+      <button id="theme-toggle" class="theme-toggle">
+        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M484-80q-84 0-157.5-32t-128-86.5Q144-253 112-326.5T80-484q0-146 93-257.5T410-880q-18 99 11 193.5T521-521q71 71 165.5 100T880-410q-26 144-138 237T484-80Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T464-465q-61-61-97-138t-43-163q-77 43-120.5 118.5T160-484q0 135 94.5 229.5T484-160Zm-20-305Z"/></svg>
+        Dark Mode
+      </button>
       <h1 style="display: flex; align-items: center; justify-content: center; gap: 8px; color: #d30aac;">
         <img src="images/atom-pink.svg" alt="Earth Icon" width="50" height="50">
         School Finder
@@ -418,5 +500,36 @@
   </div>
 
   <script src="school-finder.js"></script>
+  <script>
+    const sunIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#fff">
+        <path d="M440-760v-160h80v160h-80Zm266 110-55-55 112-115 56 57-113 113Zm54 210v-80h160v80H760ZM440-40v-160h80v160h-80ZM254-652 140-763l57-56 113 113-56 54Zm508 512L651-255l54-54 114 110-57 59ZM40-440v-80h160v80H40Zm157 300-56-57 112-112 29 27 29 28-114 114Zm283-100q-100 0-170-70t-70-170q0-100 70-170t170-70q100 0 170 70t70 170q0 100-70 170t-170 70Zm0-80q66 0 113-47t47-113q0-66-47-113t-113-47q-66 0-113 47t-47 113q0 66 47 113t113 47Zm0-160Z"/>
+      </svg>`;
+
+    const moonIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#744b92">
+        <path d="M484-80q-84 0-157.5-32t-128-86.5Q144-253 112-326.5T80-484q0-146 93-257.5T410-880q-18 99 11 193.5T521-521q71 71 165.5 100T880-410q-26 144-138 237T484-80Zm0-80q88 0 163-44t118-121q-86-8-163-43.5T464-465q-61-61-97-138t-43-163q-77 43-120.5 118.5T160-484q0 135 94.5 229.5T484-160Z"/>
+      </svg>`;
+
+    const toggle = document.getElementById('theme-toggle');
+    const body = document.body;
+
+    // Load previous theme
+    if (localStorage.getItem('theme') === 'dark') {
+      body.classList.add('dark-mode');
+      toggle.innerHTML = sunIcon;
+    } else {
+      toggle.innerHTML = moonIcon;
+    }
+
+    // Toggle theme
+    toggle.addEventListener('click', () => {
+      body.classList.toggle('dark-mode');
+      const darkModeEnabled = body.classList.contains('dark-mode');
+      localStorage.setItem('theme', darkModeEnabled ? 'dark' : 'light');
+      toggle.innerHTML = darkModeEnabled ? sunIcon : moonIcon;
+    });
+  </script>
+
 </body>
 </html>

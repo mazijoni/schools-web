@@ -1,6 +1,4 @@
-// School Finder JavaScript
-
-
+// ==================== CONFIG ====================
 const KEYWORDS = [
   // Norwegian
   'grunn', 'grunnskole', 'barneskole', 'folkeskole',
@@ -54,11 +52,10 @@ const KEYWORDS = [
   'international school', 'bilingual school'
 ];
 
-
 let allSchools = [];
 let currentCity = '';
 
-// DOM Elements
+// ==================== DOM ====================
 const cityInput = document.getElementById('cityInput');
 const searchBtn = document.getElementById('searchBtn');
 const errorDiv = document.getElementById('error');
@@ -74,23 +71,61 @@ const typeFilter = document.getElementById('typeFilter');
 const nameSearch = document.getElementById('nameSearch');
 const exportBtn = document.getElementById('exportBtn');
 
-// Event Listeners
+// ==================== EVENTS ====================
 searchBtn.addEventListener('click', handleSearch);
-cityInput.addEventListener('keypress', (e) => {
-  if (e.key === 'Enter') handleSearch();
-});
-filterBtn.addEventListener('click', () => {
-  filtersDiv.classList.toggle('show');
-});
+cityInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSearch(); });
+filterBtn.addEventListener('click', () => { filtersDiv.classList.toggle('show'); });
 typeFilter.addEventListener('change', applyFilters);
 nameSearch.addEventListener('input', applyFilters);
 exportBtn.addEventListener('click', exportCSV);
 
-// Geocode city using Photon API
+// ==================== SEARCH FLOW ====================
+async function handleSearch() {
+  const city = cityInput.value.trim();
+  if (!city) return showError('Please enter a city name');
+
+  errorDiv.style.display = 'none';
+  loadingDiv.style.display = 'block';
+  resultsDiv.classList.remove('show');
+  emptyStateDiv.style.display = 'none';
+  allSchools = [];
+  currentCity = city;
+
+  try {
+    // 1️⃣ Geocode city
+    const cityInfo = await geocodeCity(city);
+    cityName.textContent = cityInfo.name;
+
+    // 2️⃣ Try Overpass (Norway/local) first
+    let result = await queryOverpass(buildOverpassQuery(cityInfo.bbox));
+    allSchools = parseOverpassResults(result);
+
+    // 3️⃣ If nothing found, fallback to SerpAPI
+    if (allSchools.length === 0) {
+      allSchools = await fetchFromSerpAPI(city);
+    }
+
+    loadingDiv.style.display = 'none';
+
+    if (allSchools.length === 0) {
+      showError('No schools found in this city');
+      emptyStateDiv.style.display = 'block';
+      return;
+    }
+
+    resultsDiv.classList.add('show');
+    applyFilters();
+  } catch (err) {
+    loadingDiv.style.display = 'none';
+    showError(err.message || 'An error occurred while searching');
+    emptyStateDiv.style.display = 'block';
+  }
+}
+
+// ==================== GEOCODE ====================
 async function geocodeCity(city) {
   const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(city)}&limit=1`;
   const res = await fetch(url);
-  
   if (!res.ok) throw new Error(`Geocoding failed: ${res.status}`);
   const data = await res.json();
   if (!data.features?.length) throw new Error('City not found');
@@ -98,22 +133,13 @@ async function geocodeCity(city) {
   const feature = data.features[0];
   const [lon, lat] = feature.geometry.coordinates;
   const delta = 0.15;
-  
-  return { 
-    lat, 
-    lon, 
-    bbox: [lon - delta, lat - delta, lon + delta, lat + delta],
-    name: feature.properties.name || city
-  };
+  return { lat, lon, bbox: [lon - delta, lat - delta, lon + delta, lat + delta], name: feature.properties.name || city };
 }
 
-// Build Overpass query
+// ==================== OVERPASS ====================
 function buildOverpassQuery(bbox) {
   const bboxStr = `${bbox[1]},${bbox[0]},${bbox[3]},${bbox[2]}`;
-  const nameFilters = KEYWORDS.map(k => 
-    `node["name"~"${k}",i](${bboxStr});way["name"~"${k}",i](${bboxStr});relation["name"~"${k}",i](${bboxStr});`
-  ).join('\n');
-  
+  const nameFilters = KEYWORDS.map(k => `node["name"~"${k}",i](${bboxStr});way["name"~"${k}",i](${bboxStr});relation["name"~"${k}",i](${bboxStr});`).join('\n');
   return `
     [out:json][timeout:60];
     (
@@ -135,37 +161,66 @@ function buildOverpassQuery(bbox) {
   `;
 }
 
-// Query Overpass API
 async function queryOverpass(query) {
   const servers = [
     'https://overpass-api.de/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.openstreetmap.fr/api/interpreter'
   ];
-
   for (const url of servers) {
     try {
-      const res = await fetch(url, {
-        method: 'POST',
-        body: query,
-        headers: {
-          'Content-Type': 'text/plain',
-          'Accept': 'application/json'
-        }
-      });
-
+      const res = await fetch(url, { method: 'POST', body: query, headers: { 'Content-Type': 'text/plain', 'Accept': 'application/json' }});
       if (!res.ok) continue;
       return await res.json();
-    } catch (err) {
-      console.warn(`Failed on ${url}:`, err.message);
-    }
+    } catch {}
   }
-  throw new Error('All Overpass servers failed');
+  return { elements: [] };
 }
 
+function parseOverpassResults(result) {
+  const elements = result.elements || [];
+  const seen = new Set();
+  return elements
+    .filter(el => {
+      const tags = el.tags || {};
+      const name = (tags.name || '').toLowerCase();
+      const amenity = tags.amenity || '';
+      const building = tags.building || '';
+      return amenity === 'school' || building === 'school' || tags.education || tags['school:type'] || KEYWORDS.some(k => name.includes(k));
+    })
+    .map(el => {
+      const tags = el.tags || {};
+      const name = tags.name || 'Unnamed School';
+      const lowerName = name.toLowerCase();
+      if (['vgs','college','high school','secondary','videregående','gymnasium'].some(s => lowerName.includes(s))) return null;
+      if (seen.has(lowerName)) return null;
+      seen.add(lowerName);
+      return { name, website: tags.website || tags['contact:website'] || '', type: detectType(tags), principal: extractEmail(tags) };
+    })
+    .filter(Boolean);
+}
+
+// ==================== SERPAPI FALLBACK ====================
+async function fetchFromSerpAPI(city) {
+  const apiKey = '81f2c16c07dd6535612e39beaa796ae8ba523edb7befcb28e1dc6852a8402bd0';
+  const url = `https://serpapi.com/search.json?q=schools+in+${encodeURIComponent(city)}&engine=google_maps&api_key=${apiKey}`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    return data.local_results?.map(school => ({
+      name: school.title || 'Unnamed School',
+      website: school.website || '',
+      type: 'Unknown',
+      principal: ''
+    })) || [];
+  } catch {
+    return [];
+  }
+}
+
+// ==================== HELPERS ====================
 function detectType(tags) {
   if (!tags) return 'Unknown';
-
   const name = (tags.name || '').toLowerCase();
   const operator = (tags.operator || '').toLowerCase();
   const ownership = (tags.ownership || '').toLowerCase();
@@ -173,269 +228,82 @@ function detectType(tags) {
   const schoolType = (tags['school:type'] || '').toLowerCase();
   const amenity = (tags.amenity || '').toLowerCase();
 
-  // Explicit tags first
-  if (['public', 'government', 'state', 'municipal', 'kommunal'].includes(operator) || 
-      ['public', 'government', 'state', 'municipal', 'kommunal'].includes(ownership) ||
-      ['public'].includes(schoolType)) return 'Public';
+  const privateHints = ['privat','privée','private','independent','foundation','montessori','friskole','waldorf','steiner','bilingual','international','charter','boarding','religious','mission','catholic','christian','islamic','jewish'];
+  const publicHints = ['kommune','municipal','fylkeskommune','public','government','state','statlig','offentlig','community','city','county','regional','district','national','folkeskole','grunnskole','primary','elementary','secondary','comprehensive','gymnasium','lycée','liceo','szkoła podstawowa','peruskoulu'];
 
-  if (['private', 'independent', 'foundation', 'charter', 'mission', 'religious'].includes(operator) || 
-      ['private', 'independent', 'foundation', 'charter', 'mission', 'religious'].includes(ownership) ||
-      ['private'].includes(schoolType)) return 'Private';
-
-  // Name hints (worldwide)
-  const privateHints = [
-    'privat', 'privée', 'private', 'independent', 'foundation', 'montessori',
-    'friskole', 'waldorf', 'steiner', 'bilingual', 'international', 'charter',
-    'boarding', 'religious', 'mission', 'catholic', 'christian', 'islamic', 'jewish'
-  ];
-
-  const publicHints = [
-    'kommune', 'municipal', 'fylkeskommune', 'public', 'government', 'state',
-    'statlig', 'offentlig', 'community', 'city', 'county', 'regional', 'district',
-    'national', 'folkeskole', 'grunnskole', 'primary', 'elementary', 'secondary',
-    'comprehensive', 'gymnasium', 'lycée', 'liceo', 'szkoła podstawowa', 'peruskoulu'
-  ];
-
+  if (['public','government','state','municipal','kommunal'].includes(operator) || ['public','government','state','municipal','kommunal'].includes(ownership) || ['public'].includes(schoolType)) return 'Public';
+  if (['private','independent','foundation','charter','mission','religious'].includes(operator) || ['private','independent','foundation','charter','mission','religious'].includes(ownership) || ['private'].includes(schoolType)) return 'Private';
   if (privateHints.some(h => name.includes(h) || operator.includes(h) || ownership.includes(h))) return 'Private';
   if (publicHints.some(h => name.includes(h) || operator.includes(h) || ownership.includes(h))) return 'Public';
-
-  // ISCED hint: Level 1 = primary (usually public)
   if (isced && ['1'].some(level => isced.includes(level))) return 'Public';
-
-  // Fallback based on amenity/building tag
   if (amenity === 'school' || tags.building === 'school') return 'Unknown';
-
   return 'Unknown';
 }
 
-
-// Extract email information
 function extractEmail(tags) {
   if (!tags) return '';
-
-  const emailKeys = [
-    'email',
-    'contact:email',
-    'operator:email',
-    'school:email',
-    'contact:mail',
-    'mail'
-  ];
-
-  // Check direct email tags
+  const emailKeys = ['email','contact:email','operator:email','school:email','contact:mail','mail'];
   for (const key of emailKeys) {
     const value = tags[key];
-    if (value && typeof value === 'string') {
-      const cleaned = value.trim();
-      // Basic email validation
-      if (cleaned && cleaned.includes('@') && cleaned.includes('.')) {
-        return cleaned;
-      }
-    }
+    if (value && typeof value === 'string' && value.includes('@') && value.includes('.')) return value.trim();
   }
-
-  // Check description or contact:details for embedded emails
-  const descriptionTags = ['description', 'contact:details', 'note', 'operator:description'];
-  for (const key of descriptionTags) {
+  const descKeys = ['description','contact:details','note','operator:description'];
+  for (const key of descKeys) {
     const desc = tags[key];
     if (desc && typeof desc === 'string') {
-      // Look for email pattern
-      const emailMatch = desc.match(/[\w.-]+@[\w.-]+\.\w+/);
-      if (emailMatch) {
-        return emailMatch[0];
-      }
+      const match = desc.match(/[\w.-]+@[\w.-]+\.\w+/);
+      if (match) return match[0];
     }
   }
-
   return '';
 }
 
-
-// Show error message
+// ==================== UI ====================
 function showError(message) {
   errorDiv.textContent = message;
   errorDiv.style.display = 'block';
-  setTimeout(() => {
-    errorDiv.style.display = 'none';
-  }, 5000);
+  setTimeout(() => { errorDiv.style.display = 'none'; }, 5000);
 }
 
-// Main search handler
-async function handleSearch() {
-  const city = cityInput.value.trim();
-  
-  if (!city) {
-    showError('Please enter a city name');
-    return;
-  }
-
-  // Reset state
-  errorDiv.style.display = 'none';
-  loadingDiv.style.display = 'block';
-  resultsDiv.classList.remove('show');
-  emptyStateDiv.style.display = 'none';
-  allSchools = [];
-  currentCity = city;
-
-  try {
-    // Geocode city
-    const cityInfo = await geocodeCity(city);
-    cityName.textContent = cityInfo.name;
-    
-    // Build and execute query
-    const query = buildOverpassQuery(cityInfo.bbox);
-    const result = await queryOverpass(query);
-
-    const elements = result.elements || [];
-    
-    // Process schools
-    const seen = new Set();
-    allSchools = elements
-      .filter(el => {
-        const tags = el.tags || {};
-        const name = (tags.name || '').toLowerCase();
-        const amenity = tags.amenity || '';
-        const building = tags.building || '';
-        return (
-          amenity === 'school' ||
-          building === 'school' ||
-          tags.education ||
-          tags['school:type'] ||
-          KEYWORDS.some(k => name.includes(k))
-        );
-      })
-      .map(el => {
-        const tags = el.tags || {};
-        const name = tags.name || 'Unnamed School';
-        const website = tags.website || tags['contact:website'] || '';
-        const type = detectType(tags);
-        const principal = extractEmail(tags);
-
-        // Exclude VGS, college, high schools, and anything after primary/elementary
-        const lowerName = name.toLowerCase();
-        if (
-          lowerName.includes('vgs') || 
-          lowerName.includes('college') || 
-          lowerName.includes('high school') || 
-          lowerName.includes('secondary') || 
-          lowerName.includes('videregående') ||
-          lowerName.includes('gymnasium')
-        ) {
-          return null;
-        }
-
-        if (seen.has(lowerName)) return null;
-        seen.add(lowerName);
-
-        return { name, website, type, principal };
-      })
-      .filter(Boolean);
-
-
-    loadingDiv.style.display = 'none';
-
-    if (allSchools.length === 0) {
-      showError('No schools found in this city');
-      emptyStateDiv.style.display = 'block';
-      return;
-    }
-
-    // Display results
-    resultsDiv.classList.add('show');
-    applyFilters();
-
-  } catch (err) {
-    loadingDiv.style.display = 'none';
-    showError(err.message || 'An error occurred while searching');
-    emptyStateDiv.style.display = 'block';
-  }
-}
-
-// Apply filters and render schools
 function applyFilters() {
   const typeValue = typeFilter.value.toLowerCase();
   const searchValue = nameSearch.value.toLowerCase();
-
-  const filtered = allSchools.filter(school => {
-    const matchesType = typeValue === 'all' || school.type.toLowerCase() === typeValue;
-    const matchesSearch = school.name.toLowerCase().includes(searchValue);
-    return matchesType && matchesSearch;
-  });
-
+  const filtered = allSchools.filter(school => (typeValue === 'all' || school.type.toLowerCase() === typeValue) && school.name.toLowerCase().includes(searchValue));
   schoolCount.textContent = filtered.length;
   renderSchools(filtered);
 }
 
-// Render schools to the grid
 function renderSchools(schools) {
   if (schools.length === 0) {
     schoolsGrid.innerHTML = '<div style="text-align: center; padding: 40px; color: #718096;">No schools match your filters</div>';
     return;
   }
-
-  schoolsGrid.innerHTML = schools.map(school => {
-    const badgeClass = `badge-${school.type.toLowerCase()}`;
-    
-    return `
-      <div class="school-card">
-        <div class="school-header">
-          <div class="school-info">
-            <div class="school-name">${escapeHtml(school.name)}</div>
-            <div class="school-details">
-              ${school.website ? `
-                <div class="school-detail">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="17px" viewBox="0 -960 960 960" width="17px" fill="#d30aac"><path d="M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z"/></svg>
-                  <a href="${escapeHtml(school.website)}" target="_blank" rel="noopener">${escapeHtml(school.website)}</a>
-                </div>
-              ` : ''}
-              ${school.principal ? `
-                <div class="school-detail">
-                  <svg xmlns="http://www.w3.org/2000/svg" height="17px" viewBox="0 -960 960 960" width="17px" fill="#000000"><path d="M480-480q-66 0-113-47t-47-113q0-66 47-113t113-47q66 0 113 47t47 113q0 66-47 113t-113 47ZM160-160v-112q0-34 17.5-62.5T224-378q62-31 126-46.5T480-440q66 0 130 15.5T736-378q29 15 46.5 43.5T800-272v112H160Zm80-80h480v-32q0-11-5.5-20T700-306q-54-27-109-40.5T480-360q-56 0-111 13.5T260-306q-9 5-14.5 14t-5.5 20v32Zm240-320q33 0 56.5-23.5T560-640q0-33-23.5-56.5T480-720q-33 0-56.5 23.5T400-640q0 33 23.5 56.5T480-560Zm0-80Zm0 400Z"/></svg>
-                  ${escapeHtml(school.principal)}
-                </div>
-              ` : ''}
-            </div>
-          </div>
-          <div class="badge ${badgeClass}">${school.type}</div>
-        </div>
-      </div>
-    `;
-  }).join('');
+  schoolsGrid.innerHTML = schools.map(school => `
+    <div class="school-card">
+      <div class="school-name">${escapeHtml(school.name)}</div>
+      <div class="school-type">${school.type}</div>
+      ${school.website ? `<div class="school-website"><a href="${escapeHtml(school.website)}" target="_blank">${escapeHtml(school.website)}</a></div>` : ''}
+      ${school.principal ? `<div class="school-principal">${escapeHtml(school.principal)}</div>` : ''}
+    </div>
+  `).join('');
 }
 
-// Export to CSV
 function exportCSV() {
   const typeValue = typeFilter.value.toLowerCase();
   const searchValue = nameSearch.value.toLowerCase();
-
-  const filtered = allSchools.filter(school => {
-    const matchesType = typeValue === 'all' || school.type.toLowerCase() === typeValue;
-    const matchesSearch = school.name.toLowerCase().includes(searchValue);
-    return matchesType && matchesSearch;
-  });
-
-  const headers = ['School Name', 'Website', 'Type', 'Principal'];
-  const rows = filtered.map(s => [
-    s.name,
-    s.website,
-    s.type,
-    s.principal
-  ]);
-  
-  const csv = [headers, ...rows]
-    .map(row => row.map(cell => `"${cell}"`).join(','))
-    .join('\n');
-  
+  const filtered = allSchools.filter(school => (typeValue === 'all' || school.type.toLowerCase() === typeValue) && school.name.toLowerCase().includes(searchValue));
+  const headers = ['School Name','Website','Type','Principal'];
+  const rows = filtered.map(s => [s.name, s.website, s.type, s.principal]);
+  const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `${currentCity.replace(/[^a-z0-9]/gi, '_')}_schools.csv`;
+  a.download = `${currentCity.replace(/[^a-z0-9]/gi,'_')}_schools.csv`;
   a.click();
   window.URL.revokeObjectURL(url);
 }
 
-// Escape HTML to prevent XSS
 function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
