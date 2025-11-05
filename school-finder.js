@@ -9,6 +9,56 @@ const KEYWORDS = [
   'international school', 'bilingual school', 'primary', 'elementary', 'school'
 ];
 
+const EXCLUDE_KEYWORDS = [
+  // ===== ENGLISH =====
+  'high school', 'secondary', 'senior high', 'upper school', 'college',
+  'university', 'academy', 'institute', 'campus', 'technical', 'polytechnic',
+  'junior college', 'vocational', 'training center', 'training centre',
+  'art school', 'music school', 'law school', 'medical school',
+  'business school', 'driving school', 'language school', 'ballet school',
+
+  // ===== NORDIC =====
+  'videregående', 'universitet', 'høyskole', 'hogskole', 'gymnas', 'akademi',
+  'folkehøgskole', 'teknisk skole', 'yrkesskole',
+
+  // ===== GERMANIC =====
+  'gymnasium', 'hochschule', 'universität', 'fachhochschule', 'college',
+  'berufsschule', 'technikum', 'akademie', 'institut',
+
+  // ===== ROMANCE (French, Spanish, Italian, Portuguese) =====
+  'lycée', 'collège', 'université', 'institut', 'faculdade', 'universidad',
+  'liceo', 'liceum', 'escola secundaria', 'escuela secundaria',
+  'escuela superior', 'ensino médio', 'instituto', 'colegio maior',
+  'centro de formación', 'centro tecnico', 'centro universitario',
+
+  // ===== SLAVIC / EASTERN EUROPE =====
+  'liceum', 'gimnazjum', 'universitet', 'institut', 'kolej', 'technikum',
+  'szkoła średnia', 'średnia', 'akademia', 'vysoká škola', 'stredná škola',
+  'tehnična šola', 'učilište', 'fakulta',
+
+  // ===== ASIAN (Romanized & Latin forms) =====
+  'koukou', 'daigaku', 'daxue', 'zhongxue', 'gao zhong', 'gaozhong',
+  'sekolah menengah', 'sekolah menengah atas', 'universitas', 'kampus',
+  'mahad', 'pesantren', 'kolej', 'institut', 'akademi', 'polytechnic',
+  'sarjana', 'pendidikan tinggi',
+
+  // ===== ARABIC (transliterated) =====
+  'jamiat', 'kulliyyah', 'maahad', 'markaz taalim', 'madrasah thanawiyah',
+  'madrasa aliyah',
+
+  // ===== AFRICAN / INDIAN =====
+  'senior secondary', 'senior high', 'polytechnic', 'tertiary', 'technical college',
+  'junior college', 'advanced school', 'higher institute',
+
+  // ===== EASTERN / MISC =====
+  'liceu', 'institut scolaire', 'liceo artistico', 'liceo scientifico',
+  'liceo linguistico', 'liceo tecnico', 'liceo classico', 'liceo musicale',
+  'liceo delle scienze', 'liceo delle scienze umane', 'liceo sportivo',
+
+  // ===== COMMON DOMAIN INDICATORS =====
+  '.edu', '.ac.', '.uni', '.college', '.campus', '.polytechnic', '.vocational'
+];
+
 let allSchools = [];
 let currentCity = '';
 
@@ -151,16 +201,24 @@ async function handleSearch() {
     const elements = result.elements || [];
     const seen = new Set();
 
-    allSchools = elements.map(el=>{
-      const tags = el.tags||{};
-      const name = tags.name||'Unnamed School';
+    allSchools = elements.map(el => {
+      const tags = el.tags || {};
+      const name = tags.name || 'Unnamed School';
+      const website = (tags.website || tags['contact:website'] || '').toLowerCase();
       const lowerName = name.toLowerCase();
-      if(seen.has(lowerName)) return null;
+      if (seen.has(lowerName)) return null;
       seen.add(lowerName);
+
+      // Check both name and website for unwanted keywords
+      const shouldExclude = EXCLUDE_KEYWORDS.some(word =>
+        lowerName.includes(word) || website.includes(word)
+      );
+
+      if (shouldExclude) return null;
 
       return {
         name,
-        website: tags.website||tags['contact:website']||'',
+        website,
         type: detectType(tags),
         principal: extractEmail(tags)
       };
@@ -230,7 +288,8 @@ function exportCSV(){
   const filtered = allSchools.filter(s=>{
     const matchesType = typeValue==='all'||s.type.toLowerCase()===typeValue;
     const matchesSearch = s.name.toLowerCase().includes(searchValue);
-    return matchesType && matchesSearch;
+    const isNotHighSchool = !s.type.toLowerCase().includes('high');
+    return matchesType && matchesSearch && isNotHighSchool;
   });
 
   const headers = ['School Name','Website','Type','Principal'];
