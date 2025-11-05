@@ -1,4 +1,4 @@
-// =================== School Finder JS (Worldwide) ===================
+// school finder.js
 
 const KEYWORDS = [
   // Norwegian
